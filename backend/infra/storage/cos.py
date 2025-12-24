@@ -5,10 +5,11 @@ from qcloud_cos import CosS3Client
 
 sid = os.getenv("SECRET_ID")
 sk = os.getenv("SECRET_KEY")
+bn = os.getenv("BUCKET_NAME")
 r = "ap-shanghai"
 
 class CosClient:
-    Bucket = "exampaper-test-1384695153"
+    Bucket = bn
 
 
     def __init__(self):

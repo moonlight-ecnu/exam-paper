@@ -30,3 +30,17 @@ def get_value(key):
     except RedisError as e:
         logging.error(f"redis get key:[ {key} ] failed with error {e}")
 
+def has_key(key):
+    r = current_app.extensions["redis_client"]
+    try:
+        return r.exists(key)
+    except RedisError as e:
+        logging.error(f"redis get key:[ {key} ] failed with error {e}")
+
+
+def delete_kv(key):
+    r = current_app.extensions["redis_client"]
+    try:
+        r.delete(key)
+    except RedisError as e:
+        pass # 删除失败不影响，过期也会自动处理

@@ -18,7 +18,7 @@ def succeed(payload, code=0, msg="success"):
 
 def fail(payload, code=999, msg="unknown error"):
     if isinstance(payload, BizException):  # 若返回值为业务异常类, 则不应该有payload, 只返回code和msg
-        if payload.code == 1000 or payload.code == 1001:
+        if payload.code == 1000 or payload.code == 1001: # TODO 规范错误码
             abort(403)
         return jsonify({"code": payload.code, "msg": payload.msg})
     elif isinstance(payload, Response):  # 若返回值为响应类, 需要有payload

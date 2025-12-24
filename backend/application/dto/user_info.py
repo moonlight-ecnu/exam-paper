@@ -8,17 +8,17 @@ class UserInfo(Response):
     UserInfo 返回给前端的用户信息类
     """
     def __init__(self, user: User):
-        self.user_id = user.id
-        self.name = user.name
+        self.user_id = str(user.id)
+        self.name = user.user_name
         self.email = user.email
-        self.token = create_jwt({"id": str(user.id)}) # 将用户_id放入jwt中
+        self.token = create_jwt({'id': str(user.id)}) # 将用户_id放入jwt中
 
     def to_dict(self)->dict:
         return {
-            "user_id": self.user_id,
-            "name": self.name,
-            "email": self.email,
-            "token": self.token
+            'user_id': self.user_id,
+            'name': self.name,
+            'email': self.email,
+            'token': self.token
         }
 
 

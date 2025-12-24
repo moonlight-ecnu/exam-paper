@@ -13,13 +13,13 @@ def create_jwt(payload: dict[str, any], exp_minutes=120) -> str:
     应当遵循最小化payload原则
     """
     payload['exp'] = datetime.datetime.now() + datetime.timedelta(minutes=exp_minutes)
-    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
-    return token
+    tk = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
+    return tk
 
-def verify_jwt(token):
+def verify_jwt(tk):
     try:
         # 验证JWT
-        decoded_payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        decoded_payload = jwt.decode(tk, JWT_SECRET, algorithms=['HS256'])
         return decoded_payload
     except jwt.ExpiredSignatureError:
         # JWT过期
@@ -31,8 +31,8 @@ def verify_jwt(token):
         raise e
 
 
-def get_id_from_jwt(token)->str:
-    payload = verify_jwt(token)
+def get_id_from_jwt(tk)->str:
+    payload = verify_jwt(tk)
     return payload['id']
 
 if __name__ == '__main__':

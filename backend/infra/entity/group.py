@@ -19,6 +19,9 @@ class Group(Document):
         """返回组内成员权限-是否是admin"""
         return self.members.get(user_id)
 
+    def count_member(self):
+        return self.members.count()
+
 class Invitation(Document):
     """小组相关的邀请"""
     target = StringField(required=True) # 被邀请人(邮箱?)

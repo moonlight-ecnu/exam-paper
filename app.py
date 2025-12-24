@@ -3,7 +3,7 @@ import logging
 from flask import Flask
 
 from backend.infra.config.config import init_app
-
+from backend.adaptor.bp import register_bp
 from backend.infra.util.smtp_util import send_verify_code, check_verify_code
 
 
@@ -11,7 +11,7 @@ def create_app():
     app = Flask(__name__)
 
     # 注册blueprint
-
+    register_bp(app)
 
     # 初始化数据库连接和基础组件
     init_app(app)
@@ -23,9 +23,9 @@ app = create_app()
 
 if __name__ == '__main__':
     logging.info("Application started")
-    app.run("0.0.0.0", port=5000)
+    app.run("127.0.0.1", port=5000)
 
-    # 测试邮件验证
+    # # 测试邮件验证
     # with app.app_context():
     #     target = "3071466454@qq.com"
     #     res = send_verify_code(target)

@@ -10,14 +10,14 @@ from backend.infra.consts.smtp import SENDER, SUBJECT, SMTP_PORT, SMTP_SERVER, A
 from backend.infra.util import redis_util
 
 
-def send_verify_code(target:str)->bool:
-    """向{target}发送验证码，返回发送成功与否"""
+def send_verify_code(target:str)->str:
+    """向{target}发送验证码，并存储 [邮箱-验证码]"""
     # 创建邮件
     message = MIMEMultipart()
     message['From'] = SENDER
     message['To'] = target
     message['Subject'] = SUBJECT
-    # 生成并暂存验证码
+    # 生成并存储验证码
     code = set_verify_code(target)
     # 邮件正文
     html_content = VERIFY_CODE_TEMPLATE.replace("{verification_code}", code)
@@ -31,10 +31,12 @@ def send_verify_code(target:str)->bool:
 
         server.sendmail(SENDER, target, message.as_string())
         server.quit()
-        return True
+        return code
     except Exception as e:
         logging.error(e)
-        return False
+        return ""
+
+
 
 def set_verify_code(target:str):
     """
@@ -49,4 +51,4 @@ def check_verify_code(target:str, verify_code:str):
     code = redis_util.get_value(f"verify:{target}")
     if code is None:
         return False
-    return verify_code == code
+    return verify_code == code.decode('utf-8')
