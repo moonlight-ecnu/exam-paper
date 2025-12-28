@@ -78,7 +78,8 @@ def upload():
     :return:
         file_info 文件信息类，包含access_url
     """
-    data = request.get_json()
+    # For multipart/form-data, use request.form for fields
+    data = request.form
     uid = jwt_util.get_id_from_jwt(request.headers.get('Authorization'))
     file = request.files.get('file')
     try:
@@ -102,6 +103,35 @@ def download():
     uid = jwt_util.get_id_from_jwt(request.headers.get('Authorization'))
     try:
         res = group.download(data, uid)
+    except BizException as e:
+        return re.fail(e)
+    return re.succeed(res)
+
+
+@bp.route('/list_files', methods=['POST'])
+def list_files():
+    """
+    列出文件
+    :param:
+        group_id 小组id
+    """
+    data = request.get_json()
+    uid = jwt_util.get_id_from_jwt(request.headers.get('Authorization'))
+    try:
+        res = group.list_files(data, uid)
+    except BizException as e:
+        return re.fail(e)
+    return re.succeed(res)
+
+
+@bp.route('/my_groups', methods=['GET', 'POST'])
+def my_groups():
+    """
+    列出我的小组
+    """
+    uid = jwt_util.get_id_from_jwt(request.headers.get('Authorization'))
+    try:
+        res = group.my_groups(uid)
     except BizException as e:
         return re.fail(e)
     return re.succeed(res)

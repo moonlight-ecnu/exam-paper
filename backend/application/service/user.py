@@ -64,10 +64,12 @@ def login(data):
         raise BE.error(ErrorCode.USER_NOT_FOUND)
     except Exception as e:
         logging.error(e)
-        raise e
+        # 不要直接抛出 Exception，否则会被 Flask 捕获为 500
+        # 除非是 BizException，否则应该包装一下或者记录日志后抛出通用错误
+        raise BE.error(ErrorCode.INTERNAL_ERROR)
 
     # 验证码登录
-    if data["verify_code"]:
+    if "verify_code" in data and data["verify_code"]:
         # 校验验证码
         verify_code = get_param("verify_code", data)
         check = smtp_util.check_verify_code(email, verify_code)
@@ -75,7 +77,7 @@ def login(data):
             raise BE.error(ErrorCode.INVALID_CODE)
 
     # 密码登录
-    elif data["password"]:
+    elif "password" in data and data["password"]:
         # md5加密处理
         password = get_param("password", data)
         en_password = md5_encrypt(password)

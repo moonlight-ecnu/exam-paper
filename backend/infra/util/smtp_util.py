@@ -51,4 +51,9 @@ def check_verify_code(target: str, verify_code: str):
     code = redis_util.get_value(f"verify:{target}")
     if code is None:
         return False
-    return verify_code == code.decode('utf-8')
+    # Ensure both are strings for comparison. Redis returns bytes.
+    if isinstance(code, bytes):
+        code = code.decode('utf-8')
+    if verify_code is None:
+        return False
+    return str(verify_code) == code

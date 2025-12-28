@@ -1,10 +1,9 @@
 import logging
 from datetime import datetime
-from fileinput import filename
 
 from mongoengine.errors import DoesNotExist
 
-from backend.infra.consts.storage import GROUP_COS_PATH_ORIGIN, GROUP_COS_PATH_GEN
+from backend.infra.consts.storage import GROUP_COS_PATH, GROUP_COS_PATH_ORIGIN, GROUP_COS_PATH_GEN
 from backend.infra.storage.cos import cos_client
 
 from backend.application.dto.file_info import FileInfo, GenFileInfo
@@ -19,7 +18,19 @@ from backend.infra.exception.exception import BizException as BE
 
 from backend.infra.util import redis_util
 from backend.infra.util.req_util import get_param
+from backend.infra.util.completion import parser_img_bytes
 
+
+def _get_group_info_with_members(g):
+    """Helper to create GroupInfo with member names"""
+    try:
+        member_ids = list(g.members.keys())
+        users = User.objects(id__in=member_ids)
+        member_names = {str(u.id): u.user_name for u in users}
+        return GroupInfo(g, member_names)
+    except Exception as e:
+        logging.error(f"Error fetching group members: {e}")
+        return GroupInfo(g)
 
 # 小组管理相关
 def create(data, user_id):
@@ -38,7 +49,7 @@ def create(data, user_id):
         raise BE.error(ErrorCode.REGISTER_FAILED)
     # 创建小组目录
     cos_client.create_dir(GROUP_COS_PATH.format(group_id=str(g.id)))
-    return GroupInfo(g)
+    return _get_group_info_with_members(g)
 
 
 def dismiss(data):
@@ -109,9 +120,11 @@ def upload(file, data, user_id):
     # 参数提取
     if file is None:
         raise BE.error(ErrorCode.INVALID_PARAMETER)
+    
     group_id = get_param("group_id", data)
     subject = get_param("subject", data)
-    year = get_param("year", data)
+    # Optional fields
+    year = data.get("year")
     paper_type = get_param("paper_type", data) # 试卷类型：考试/竞赛
     exam_type = data.get("exam_type")
     description = data.get("description", "")
@@ -121,44 +134,80 @@ def upload(file, data, user_id):
         g = Group.objects.get(id=group_id) # 小组存在
     except DoesNotExist:
         raise BE.error(ErrorCode.GROUP_NOT_FOUND)
+    except ValidationError:
+        raise BE.error(ErrorCode.INVALID_PARAMETER)
 
     if not g.has_member(user_id): # 小组有成员
         raise BE.error(ErrorCode.GROUP_NO_MEMBER)
 
+    # Read file content
+    file_content = file.read()
+    if not file_content:
+        raise BE.error(ErrorCode.INVALID_PARAMETER)
+
     # 构建对象键："{组prefix}/origin/{时间戳字符串}/{文件名}" 用于存入db、调用cos进行上传
     ts = datetime.now().strftime("%Y%m%d%H%M%S") # 时间戳
     fn = file.filename
-    ock = f"{GROUP_COS_PATH_ORIGIN}{ts}/{fn}"
+    ock = f"{GROUP_COS_PATH_ORIGIN.format(group_id=group_id)}{ts}/{fn}"
 
-    # 构建原始文件的[数据库document]并存储
-    db_file = File(
-        author_id=user_id,
-        group_id=group_id,
-        filename=fn, # 从网络传输的file中得到文件名
-        cos_key=ock,
-        meta_info=MetaInfo(
-            subject=subject,
-            year=year,
-            description=description,
-            content_type=paper_type,
-            exam_type=exam_type,
+    # 1. 上传原文件至cos
+    try:
+        cos_client.upload_from_fp(file_content, ock)
+    except Exception as e:
+        logging.error(f"COS Upload Origin Failed: {e}")
+        raise BE.error(ErrorCode.INTERNAL_ERROR)
+
+    # 2. 构建原始文件的[数据库document]并存储
+    try:
+        db_file = File(
+            author_id=user_id,
+            group_id=group_id,
+            filename=fn, # 从网络传输的file中得到文件名
+            cos_key=ock,
+            meta_info=MetaInfo(
+                subject=subject,
+                year=year,
+                description=description,
+                content_type=paper_type,
+                exam_type=exam_type,
+            )
         )
-    )
-    db_file.save()
+        db_file.save()
+    except Exception as e:
+        logging.error(f"DB Save File Failed: {e}")
+        raise BE.error(ErrorCode.INTERNAL_ERROR)
 
-    # 上传原文件至cos
+    # 3. 调用模型并创建生成文件
+    try:
+        html_content = parser_img_bytes(file_content)
+    except Exception as e:
+        logging.error(f"Model Generation Failed: {e}")
+        # Return success for origin file, but log error for generation
+        return FileInfo(db_file)
 
-    # 调用模型并创建生成文件
+    # 4. 上传生成文件至cos
+    gck = f"{GROUP_COS_PATH_GEN.format(group_id=group_id)}{ts}/{fn}.html"
+    try:
+        cos_client.upload_from_fp(html_content.encode('utf-8'), gck)
+    except Exception as e:
+        logging.error(f"COS Upload Gen Failed: {e}")
+        return FileInfo(db_file)
 
-    # 对象键
-    gck = ""
-    # 构建生成文件的[数据库document]并存储
-    gen_file = GenFile()
-    gen_file.save()
+    # 5. 构建生成文件的[数据库document]并存储
+    try:
+        gen_file = GenFile(
+            cos_key=gck,
+            title=f"Parsed: {fn}",
+            source_id=str(db_file.id),
+            group_id=group_id,
+            preview_data={}, 
+            status='active'
+        )
+        gen_file.save()
+    except Exception as e:
+        logging.error(f"DB Save GenFile Failed: {e}")
 
-    # 上传生成文件至cos
-
-    # 返回空响应，controller层使用re.success返回
+    return FileInfo(db_file)
 
 
 def delete_file():
@@ -169,14 +218,44 @@ def delete_file():
     pass
 
 
-def list_files():
+def list_files(data, user_id):
     """
     列出小组内符合filter的所有文件
-    - 要求前端给出规范且有效的filter
-    - mvp版本中暂时不提供filter功能
     """
-    pass
+    group_id = get_param("group_id", data)
 
+    # Check group permission
+    try:
+        g = Group.objects.get(id=group_id)
+    except DoesNotExist:
+        raise BE.error(ErrorCode.GROUP_NOT_FOUND)
+    if not g.has_member(user_id):
+        raise BE.error(ErrorCode.GROUP_NO_MEMBER)
+
+    # Filter files
+    files = File.objects(group_id=group_id).order_by('-created_at')
+    
+    # Return file list
+    return [FileInfo(f).to_dict() for f in files]
+
+def my_groups(user_id):
+    """
+    列出用户加入的所有小组
+    """
+    # Using raw query or iterating. MongoEngine doesn't support querying keys of DictField easily in older versions
+    # But we can query where "members.user_id" exists.
+    # However, members is DictField. 
+    # Alternative: iterate all groups (inefficient) or better schema.
+    # For MVP, let's use a simple scan or assume schema supports query.
+    # Actually, we can use __raw__ query for mongodb
+    
+    # Using Q object for more complex queries if needed, but for DictField key existence:
+    # groups = Group.objects(members__haskey=user_id) # This syntax might vary
+    
+    # Let's fallback to raw query which is reliable
+    groups = Group.objects(__raw__={f"members.{user_id}": {"$exists": True}})
+    
+    return [_get_group_info_with_members(g).to_dict() for g in groups]
 
 def download(data, user_id):
     """
@@ -210,12 +289,15 @@ def download(data, user_id):
     
     elif target_type == "gen":
         try:
+            # First try to find by ID directly (if frontend passed gen file ID)
             db_f = GenFile.objects.get(id=file_id, group_id=group_id)
-        except DoesNotExist:
-            raise BE.error(ErrorCode.DB_NOT_FOUND)
+        except (DoesNotExist, Exception):
+             # Fallback: try to find by source_id (if frontend passed origin file ID)
+            try:
+                db_f = GenFile.objects.get(source_id=file_id, group_id=group_id)
+            except DoesNotExist:
+                raise BE.error(ErrorCode.DB_NOT_FOUND)
         return GenFileInfo(db_f)
     
     else:
         raise BE.error(ErrorCode.INVALID_REQUEST_TYPE)
-
-

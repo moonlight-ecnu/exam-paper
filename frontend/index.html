@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamPaper - 试卷共享平台</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- 登录/注册页 -->
+    <div id="auth-page" class="container auth-container">
+        <div class="card">
+            <h2 class="text-center" style="text-align: center;">ExamPaper</h2>
+            <div class="nav-tabs">
+                <div class="nav-tab active" onclick="app.switchAuth('login')">登录</div>
+                <div class="nav-tab" onclick="app.switchAuth('register')">注册</div>
+            </div>
+
+            <!-- 登录表单 -->
+            <div id="login-form">
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" id="login-email" placeholder="请输入邮箱">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="login-password" placeholder="请输入密码">
+                </div>
+                <button style="width: 100%" onclick="app.handleLogin()">登录</button>
+            </div>
+
+            <!-- 注册表单 -->
+            <div id="register-form" class="hidden">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="reg-username" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" id="reg-email" placeholder="请输入邮箱">
+                </div>
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <input type="text" id="reg-code" placeholder="验证码" style="flex: 1;">
+                    <button type="button" onclick="app.sendVerifyCode()" class="secondary" style="width: auto; white-space: nowrap;">发送验证码</button>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="reg-password" placeholder="设置密码">
+                </div>
+                <button style="width: 100%" onclick="app.handleRegister()">注册</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主界面 -->
+    <div id="main-page" class="hidden">
+        <header>
+            <div class="logo">ExamPaper</div>
+            <div class="user-info">
+                <span id="display-username">用户</span>
+                <button class="secondary" onclick="app.logout()">退出</button>
+            </div>
+        </header>
+
+        <div class="container">
+            <!-- 仪表盘：显示我的小组 -->
+            <div id="dashboard-view">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">我的学习小组</h3>
+                        <div class="action-group">
+                            <button onclick="app.showCreateGroupModal()">创建小组</button>
+                            <button class="secondary" onclick="app.showJoinGroupModal()">加入小组</button>
+                        </div>
+                    </div>
+                    
+                    <div id="group-list" class="grid">
+                        <!-- Group items will be injected here -->
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 小组详情页（默认隐藏） -->
+            <div id="group-detail-view" class="hidden">
+                <button class="secondary" onclick="app.backToDashboard()" style="margin-bottom: 20px;">&larr; 返回仪表盘</button>
+                
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 id="detail-group-name" style="margin: 0;">小组名称</h3>
+                        <div class="action-group">
+                            <button onclick="app.showInviteModal()">邀请成员</button>
+                            <button onclick="app.showUploadModal()">上传文件</button>
+                        </div>
+                    </div>
+                    <p style="color: #666; margin-bottom: 20px;">小组ID: <span id="detail-group-id" style="font-family: monospace; background: #eee; padding: 2px 5px; border-radius: 4px;"></span></p>
+
+                    <div style="display: grid; grid-template-columns: 250px 1fr; gap: 20px;">
+                        <!-- 左侧：成员列表 -->
+                        <div>
+                            <h4>成员列表</h4>
+                            <div id="member-list" class="card" style="padding: 10px; max-height: 400px; overflow-y: auto;">
+                                <div class="loading">加载中...</div>
+                            </div>
+                        </div>
+
+                        <!-- 右侧：文件列表 -->
+                        <div>
+                            <h4>文件列表</h4>
+                            <div id="file-list" style="display: flex; flex-direction: column; gap: 10px;">
+                                <!-- File items will be injected here -->
+                                <div class="loading">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 模态框：创建小组 -->
+    <div id="modal-create-group" class="modal hidden">
+        <div class="modal-content">
+            <h3>创建小组</h3>
+            <div class="form-group">
+                <input type="text" id="create-group-name" placeholder="输入小组名称">
+            </div>
+            <div class="action-group" style="justify-content: flex-end;">
+                <button class="secondary" onclick="app.closeModal('modal-create-group')">取消</button>
+                <button onclick="app.createGroup()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：加入小组 -->
+    <div id="modal-join-group" class="modal hidden">
+        <div class="modal-content">
+            <h3>加入小组</h3>
+            <div class="form-group">
+                <input type="text" id="join-group-id" placeholder="输入小组ID（邀请码）">
+            </div>
+            <div class="action-group" style="justify-content: flex-end;">
+                <button class="secondary" onclick="app.closeModal('modal-join-group')">取消</button>
+                <button onclick="app.joinGroup()">加入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：邀请成员 -->
+    <div id="modal-invite" class="modal hidden">
+        <div class="modal-content">
+            <h3>邀请成员</h3>
+            <div class="form-group">
+                <input type="email" id="invite-email" placeholder="受邀者邮箱">
+            </div>
+            <div class="action-group" style="justify-content: flex-end;">
+                <button class="secondary" onclick="app.closeModal('modal-invite')">取消</button>
+                <button onclick="app.inviteUser()">发送邀请</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：上传文件 -->
+    <div id="modal-upload" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3>上传文件</h3>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="form-group">
+                    <label>学科</label>
+                    <input type="text" id="upload-subject" value="数学">
+                </div>
+                <div class="form-group">
+                    <label>年份</label>
+                    <input type="text" id="upload-year" value="2024">
+                </div>
+                <div class="form-group">
+                    <label>试卷类型</label>
+                    <select id="upload-paper-type" onchange="app.toggleExamType()">
+                        <option value="exam">考试</option>
+                        <option value="contest">竞赛</option>
+                        <option value="exercise">练习</option>
+                    </select>
+                </div>
+                <div class="form-group" id="exam-type-group">
+                    <label>考试类型</label>
+                    <select id="upload-exam-type">
+                        <option value="mid">期中</option>
+                        <option value="final">期末</option>
+                        <option value="monthly">月考</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <input type="text" id="upload-desc" placeholder="文件描述（可选）">
+            </div>
+            
+            <div class="file-upload-zone" onclick="document.getElementById('file-input').click()">
+                <p>点击选择文件上传</p>
+                <input type="file" id="file-input" style="display: none" onchange="app.handleFileSelect(this)">
+                <p id="file-name-display" style="color: #666; font-size: 0.9em;"></p>
+            </div>
+
+            <div class="action-group" style="justify-content: flex-end;">
+                <button class="secondary" onclick="app.closeModal('modal-upload')">取消</button>
+                <button onclick="app.uploadFile()" id="upload-btn" disabled>上传</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="log-container"></div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

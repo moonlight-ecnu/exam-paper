@@ -1,0 +1,7 @@
+flask
+mongoengine
+redis
+qcloud-cos-python
+requests
+PyYAML
+flask-cors
