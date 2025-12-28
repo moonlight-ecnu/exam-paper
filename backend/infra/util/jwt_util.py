@@ -16,6 +16,7 @@ def create_jwt(payload: dict[str, any], exp_minutes=120) -> str:
     tk = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
     return tk
 
+
 def verify_jwt(tk):
     try:
         # 验证JWT
@@ -31,16 +32,17 @@ def verify_jwt(tk):
         raise e
 
 
-def get_id_from_jwt(tk)->str:
+def get_id_from_jwt(tk) -> str:
     payload = verify_jwt(tk)
     return payload['id']
 
+
 if __name__ == '__main__':
-    token = create_jwt({"id":"TestUser"})
+    token = create_jwt({"id": "TestUser"})
     print(token)
     try:
         verify_jwt(token)
     except Exception as e:
         logging.error(e)
     else:
-        print(f"Username: {get_id_from_jwt(token)}") # success
+        print(f"Username: {get_id_from_jwt(token)}")  # success

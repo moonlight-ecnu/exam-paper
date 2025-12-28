@@ -3,7 +3,12 @@ import os
 
 import requests
 
-def parser_base64_img(img_path, prompt="")->str:
+
+def parser_file() -> str:
+    """"""
+
+
+def parser_base64_img(img_path, prompt="") -> str:
     """
     调用模型生成html内容
     :param:

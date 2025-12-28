@@ -5,12 +5,12 @@ import string
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from backend.infra.consts.smtp import SENDER, SUBJECT, SMTP_PORT, SMTP_SERVER, AUTHORIZATION_CODE,VERIFY_CODE_TEMPLATE
+from backend.infra.consts.smtp import SENDER, SUBJECT, SMTP_PORT, SMTP_SERVER, AUTHORIZATION_CODE, VERIFY_CODE_TEMPLATE
 
 from backend.infra.util import redis_util
 
 
-def send_verify_code(target:str)->str:
+def send_verify_code(target: str) -> str:
     """向{target}发送验证码，并存储 [邮箱-验证码]"""
     # 创建邮件
     message = MIMEMultipart()
@@ -37,17 +37,17 @@ def send_verify_code(target:str)->str:
         return ""
 
 
-
-def set_verify_code(target:str):
+def set_verify_code(target: str):
     """
     生成6位数字验证码并存储至redis中，返回生成的验证码
     """
     code = ''.join(random.choices(string.digits, k=6))
     logging.info(f"verify code of {target} is {code}")
-    redis_util.set_kv_with_expire(f"verify:{target}", code) # 默认5分钟过期
+    redis_util.set_kv_with_expire(f"verify:{target}", code)  # 默认5分钟过期
     return code
 
-def check_verify_code(target:str, verify_code:str):
+
+def check_verify_code(target: str, verify_code: str):
     code = redis_util.get_value(f"verify:{target}")
     if code is None:
         return False

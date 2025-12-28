@@ -29,7 +29,7 @@ class ErrorCode(Enum):
     GROUP_CREATE_FAILED = (4001, "group create failed, please try again later")
     GROUP_INVITATION_FAILED = (4002, "failed to initiate invitation")
     GROUP_NOT_INVITED = (4003, "not invited by the group, please wait for invitation")
-
+    GROUP_NO_MEMBER = (4004, "Group doesn't have this member")
 
     UPLOAD_FAILED = (5000, "upload file failed, please try again")
 
